@@ -1,0 +1,21 @@
+{
+  "name": "voxel-geometry",
+  "description": "import and export geometry",
+  "version": "0.0.0",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/jaekwon/voxel-geometry.git"
+  },
+  "author": {
+    "name": "Jae Kwon",
+    "email": "jkwon.work@gmail.com"
+  },
+  "license": "NoThanks",
+  "dependencies": {
+    "three": "0.54.0"
+  },
+  "engine": {
+    "node": ">=0.6.0"
+  }
+}
