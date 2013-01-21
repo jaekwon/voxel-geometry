@@ -11,7 +11,9 @@ Limitations: The binary loader could be optimized for memory.
 
 
 (function() {
-  var Triangle, parseAscii, parseBinary;
+  var THREE, Triangle, parseAscii, parseBinary;
+
+  THREE = require('three');
 
   Triangle = function() {
     var _attr;
@@ -34,27 +36,33 @@ Limitations: The binary loader could be optimized for memory.
     });
   };
 
-  this.parse = function(data) {
-    if (data.slice(0, 5) === 'solid') {
-      return parseAscii(data);
+  this.parse = function(arrayBuffer) {
+    var head, i, s, u8a, _i, _ref;
+    u8a = new Uint8Array(arrayBuffer);
+    head = String.fromCharCode.apply(null, new Uint8Array(arrayBuffer, 0, 5));
+    if (head === 'solid') {
+      s = '';
+      for (i = _i = 0, _ref = arrayBuffer.byteLength; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+        s += String.fromCharCode(u8a[i]);
+      }
+      return parseAscii(s);
     } else {
-      return parseBinary(data);
+      return parseBinary(u8a);
     }
   };
 
-  this.parseBinary = parseBinary = function(data) {
-    var face, geometry, header, i, j, len, normal, numTriangles, offset, _i, _j;
+  this.parseBinary = parseBinary = function(u8a) {
+    var face, geometry, i, j, len, normal, numTriangles, offset, _i, _j;
     geometry = new THREE.Geometry();
-    header = data.slice(0, 80);
-    numTriangles = data.charCodeAt(80) << 0;
-    numTriangles += data.charCodeAt(81) << 8;
-    numTriangles += data.charCodeAt(82) << 16;
-    numTriangles += data.charCodeAt(83) << 24;
+    numTriangles = u8a[80] << 0;
+    numTriangles += u8a[81] << 8;
+    numTriangles += u8a[82] << 16;
+    numTriangles += u8a[83] << 24;
     face = new Triangle();
     offset = 84;
     for (i = _i = 0; 0 <= numTriangles ? _i < numTriangles : _i > numTriangles; i = 0 <= numTriangles ? ++_i : --_i) {
       for (j = _j = 0; _j < 50; j = ++_j) {
-        face.__byte[j] = data.charCodeAt(offset + j);
+        face.__byte[j] = u8a[offset + j];
       }
       geometry.vertices.push(new THREE.Vector3(face.v1[0], face.v1[1], face.v1[2]));
       geometry.vertices.push(new THREE.Vector3(face.v2[0], face.v2[1], face.v2[2]));
@@ -69,20 +77,20 @@ Limitations: The binary loader could be optimized for memory.
     return geometry;
   };
 
-  this.parseAscii = parseAscii = function(data) {
-    var geometry, len, normal, patternFace, patternNormal, patternVertex, result, text;
+  this.parseAscii = parseAscii = function(text) {
+    var facetext, geometry, len, normal, patternFace, patternNormal, patternVertex, result;
     geometry = new THREE.Geometry();
     patternFace = /facet([\s\S]*?)endfacet/g;
     result = void 0;
-    while ((result = patternFace.exec(data)) !== null) {
-      text = result[0];
+    while ((result = patternFace.exec(text)) !== null) {
+      facetext = result[0];
       patternNormal = /normal[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-      while ((result = patternNormal.exec(text)) !== null) {
-        normal = new THREE.Vector3(result[1], result[3], result[5]);
+      while ((result = patternNormal.exec(facetext)) !== null) {
+        normal = new THREE.Vector3(Number(result[1]), Number(result[3]), Number(result[5]));
       }
       patternVertex = /vertex[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-      while ((result = patternVertex.exec(text)) !== null) {
-        geometry.vertices.push(new THREE.Vector3(result[1], result[3], result[5]));
+      while ((result = patternVertex.exec(facetext)) !== null) {
+        geometry.vertices.push(new THREE.Vector3(Number(result[1]), Number(result[3]), Number(result[5])));
       }
       len = geometry.vertices.length;
       geometry.faces.push(new THREE.Face3(len - 3, len - 2, len - 1, normal));

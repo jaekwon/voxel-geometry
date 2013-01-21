@@ -7,6 +7,8 @@ Description: A THREE loader for STL files, as created by Solidworks and other CA
 Limitations: The binary loader could be optimized for memory.
 ###
 
+THREE = require 'three'
+
 # Constructor for a singleton throwaway data structure...
 Triangle = ->
   @_sa =0
@@ -23,27 +25,33 @@ Triangle = ->
     enumerable: true
   })
 
-@parse = ( data ) ->
-  if data[...5] == 'solid'
-    return parseAscii(data)
+@parse = ( arrayBuffer ) ->
+  u8a = new Uint8Array( arrayBuffer )
+  head = String.fromCharCode.apply( null, new Uint8Array( arrayBuffer, 0, 5 ) )
+  if head is 'solid'
+    # TODO this could be more optimized, maybe.
+    s = ''
+    for i in [0...arrayBuffer.byteLength]
+      s += String.fromCharCode(u8a[i])
+    return parseAscii( s )
   else
-    return parseBinary(data)
+    return parseBinary( u8a )
 
-@parseBinary = parseBinary = ( data ) ->
+@parseBinary = parseBinary = ( u8a ) ->
   geometry = new THREE.Geometry()
   # Header
-  header = data[...80]
+  # header = data[...80]
   # Num triangles
-  numTriangles =  data.charCodeAt(80) << 0
-  numTriangles += data.charCodeAt(81) << 8
-  numTriangles += data.charCodeAt(82) << 16
-  numTriangles += data.charCodeAt(83) << 24
+  numTriangles =  u8a[80] << 0
+  numTriangles += u8a[81] << 8
+  numTriangles += u8a[82] << 16
+  numTriangles += u8a[83] << 24
   # console.log("Found #{numTriangles} triangles")
   face = new Triangle()
   offset = 84
   for i in [0...numTriangles]
     for j in [0...50]
-      face.__byte[j] = data.charCodeAt(offset+j)
+      face.__byte[j] = u8a[offset+j]
     # Triangles
     geometry.vertices.push new THREE.Vector3(face.v1[0], face.v1[1], face.v1[2])
     geometry.vertices.push new THREE.Vector3(face.v2[0], face.v2[1], face.v2[2])
@@ -58,20 +66,20 @@ Triangle = ->
   geometry.computeBoundingSphere()
   return geometry
 
-@parseAscii = parseAscii = ( data ) ->
+@parseAscii = parseAscii = ( text ) ->
   geometry = new THREE.Geometry()
   patternFace = /facet([\s\S]*?)endfacet/g
   result = undefined
-  while (result = patternFace.exec( data )) != null
-    text = result[ 0 ]
+  while (result = patternFace.exec( text )) != null
+    facetext = result[ 0 ]
     # Normal
-    patternNormal = /normal[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-    while (result = patternNormal.exec( text ) ) != null
-      normal = new THREE.Vector3( result[ 1 ], result[ 3 ], result[ 5 ] )
+    patternNormal = /normal[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g
+    while (result = patternNormal.exec( facetext ) ) != null
+      normal = new THREE.Vector3( Number(result[ 1 ]), Number(result[ 3 ]), Number(result[ 5 ]) )
     # Vertex
-    patternVertex = /vertex[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-    while (result = patternVertex.exec( text ) ) != null
-      geometry.vertices.push(  new THREE.Vector3( result[ 1 ], result[ 3 ], result[ 5 ] ) )
+    patternVertex = /vertex[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g
+    while (result = patternVertex.exec( facetext ) ) != null
+      geometry.vertices.push(  new THREE.Vector3( Number(result[ 1 ]), Number(result[ 3 ]), Number(result[ 5 ]) ) )
     len = geometry.vertices.length
     geometry.faces.push( new THREE.Face3( len - 3, len - 2, len - 1, normal ) )
   # Complete geometry data
