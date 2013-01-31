@@ -1,11 +1,11 @@
 {
-  "name": "voxel-geometry",
+  "name": "three-io",
   "description": "import and export geometry",
   "version": "0.0.1",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "http://github.com/jaekwon/voxel-geometry.git"
+    "url": "http://github.com/jaekwon/three-io.git"
   },
   "author": {
     "name": "Jae Kwon",
