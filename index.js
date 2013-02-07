@@ -21,6 +21,126 @@
     }
   };
 
-  this.voxelateLayer = function(geometry, pos, scale, y) {};
+  this.voxelateMesh = function(game, mesh) {
+    var THREE, consumeJob, cubeSize, end, geometry, jobs, line, material, maxX, maxXQ, maxY, maxYQ, maxZ, maxZQ, minX, minXQ, minY, minYQ, minZ, minZQ, start, vertex, worldVertex, x, xQ, y, yQ, _i, _j, _k, _len, _ref;
+    THREE = game.THREE;
+    minX = minY = minZ = maxX = maxY = maxZ = void 0;
+    cubeSize = game.cubeSize;
+    mesh.updateMatrixWorld();
+    _ref = mesh.geometry.vertices;
+    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+      vertex = _ref[_i];
+      worldVertex = vertex.clone();
+      mesh.localToWorld(worldVertex);
+      if (worldVertex.x < minX || minX === void 0) {
+        minX = worldVertex.x;
+      }
+      if (worldVertex.y < minY || minY === void 0) {
+        minY = worldVertex.y;
+      }
+      if (worldVertex.z < minZ || minZ === void 0) {
+        minZ = worldVertex.z;
+      }
+      if (worldVertex.x > maxX || maxX === void 0) {
+        maxX = worldVertex.x;
+      }
+      if (worldVertex.y > maxY || maxY === void 0) {
+        maxY = worldVertex.y;
+      }
+      if (worldVertex.z > maxZ || maxZ === void 0) {
+        maxZ = worldVertex.z;
+      }
+    }
+    minXQ = Math.floor(minX / cubeSize);
+    minYQ = Math.floor(minY / cubeSize);
+    minZQ = Math.floor(minZ / cubeSize);
+    maxXQ = Math.ceil(maxX / cubeSize);
+    maxYQ = Math.ceil(maxY / cubeSize);
+    maxZQ = Math.ceil(maxZ / cubeSize);
+    jobs = [];
+    for (yQ = _j = minYQ; minYQ <= maxYQ ? _j < maxYQ : _j > maxYQ; yQ = minYQ <= maxYQ ? ++_j : --_j) {
+      y = yQ * cubeSize;
+      for (xQ = _k = minXQ; minXQ <= maxXQ ? _k < maxXQ : _k > maxXQ; xQ = minXQ <= maxXQ ? ++_k : --_k) {
+        x = xQ * cubeSize;
+        start = new THREE.Vector3(x + cubeSize / 2, y + cubeSize / 2, minZ);
+        end = new THREE.Vector3(x + cubeSize / 2, y + cubeSize / 2, maxZ);
+        material = new THREE.LineBasicMaterial({
+          color: 0xFFFFFF
+        });
+        geometry = new THREE.Geometry();
+        geometry.vertices.push(start);
+        geometry.vertices.push(end);
+        line = new THREE.Line(geometry, material);
+        game.scene.add(line);
+        jobs.push({
+          yQ: yQ,
+          y: y,
+          xQ: xQ,
+          x: x,
+          line: line,
+          start: start,
+          end: end
+        });
+      }
+    }
+    consumeJob = function() {
+      var inside, intersect, intersectZ, intersectZQs, intersectZs, intersects, raycaster, z, zQ, _l, _ref1;
+      _ref1 = jobs.shift(), yQ = _ref1.yQ, y = _ref1.y, xQ = _ref1.xQ, x = _ref1.x, line = _ref1.line, start = _ref1.start, end = _ref1.end;
+      game.scene.remove(line);
+      raycaster = new THREE.Raycaster(start, new THREE.Vector3(0, 0, 1));
+      intersects = raycaster.intersectObject(mesh);
+      if (intersects.length > 0) {
+        if (intersects.length % 2 === 1) {
+          console.log("Intersects.length was an odd number. :(");
+          return;
+        }
+        intersectZs = (function() {
+          var _l, _len1, _results;
+          _results = [];
+          for (_l = 0, _len1 = intersects.length; _l < _len1; _l++) {
+            intersect = intersects[_l];
+            _results.push(intersect.point.z);
+          }
+          return _results;
+        })();
+        intersectZQs = (function() {
+          var _l, _len1, _results;
+          _results = [];
+          for (_l = 0, _len1 = intersectZs.length; _l < _len1; _l++) {
+            intersectZ = intersectZs[_l];
+            _results.push(Math.floor(intersectZ / cubeSize));
+          }
+          return _results;
+        })();
+        inside = false;
+        material = 1;
+        for (zQ = _l = minZQ; minZQ <= maxZQ ? _l < maxZQ : _l > maxZQ; zQ = minZQ <= maxZQ ? ++_l : --_l) {
+          z = zQ * cubeSize;
+          if (intersectZQs.length === 0 || intersectZQs[0] > zQ) {
+            if (inside) {
+              game.createBlock(new THREE.Vector3(x + cubeSize / 2, y + cubeSize / 2, z + cubeSize / 2), material);
+            }
+          } else if (intersectZQs[0] === zQ) {
+            while (intersectZQs[0] === zQ) {
+              inside = !inside;
+              if (inside) {
+                game.createBlock(new THREE.Vector3(x + cubeSize / 2, y + cubeSize / 2, z + cubeSize / 2), material);
+              }
+              intersectZs.shift();
+              intersectZQs.shift();
+            }
+          } else {
+            console.log("Should not happen");
+          }
+        }
+      }
+      if (jobs.length > 0) {
+        return setTimeout(consumeJob, 1000.0 / 60.0);
+      } else {
+        return game.scene.remove(mesh);
+      }
+    };
+    return consumeJob();
+  };
 
 }).call(this);
