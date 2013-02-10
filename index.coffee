@@ -1,7 +1,13 @@
 stlParser = require './stl_parser'
 binaryXHR = require 'binary-xhr'
 
-# Loads an external geometry.
+# Parsers have a .parse( arrayBuffer ) function.
+# Returns a THREE.Geometry
+@parsers = {
+  'stl':  stlParser
+}
+
+# Convenience method to load an external geometry.
 # Supported formats:
 #   * STL ascii
 #   * STL binary

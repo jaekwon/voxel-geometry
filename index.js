@@ -6,6 +6,10 @@
 
   binaryXHR = require('binary-xhr');
 
+  this.parsers = {
+    'stl': stlParser
+  };
+
   this.loadGeometry = function(location, callback) {
     if (typeof location === 'string') {
       return binaryXHR(location, function(error, data) {
