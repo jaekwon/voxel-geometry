@@ -74,6 +74,8 @@ Limitations: The binary loader could be optimized for memory.
     }
     geometry.computeCentroids();
     geometry.computeBoundingSphere();
+    geometry.computeFaceNormals();
+    geometry.computeVertexNormals();
     return geometry;
   };
 
@@ -97,6 +99,8 @@ Limitations: The binary loader could be optimized for memory.
     }
     geometry.computeCentroids();
     geometry.computeBoundingSphere();
+    geometry.computeFaceNormals();
+    geometry.computeVertexNormals();
     return geometry;
   };
 

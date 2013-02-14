@@ -64,6 +64,9 @@ Triangle = ->
   # Complete geometry data
   geometry.computeCentroids()
   geometry.computeBoundingSphere()
+  geometry.computeFaceNormals()
+  geometry.computeVertexNormals()
+  # geometry.normalsNeedUpdate = true
   return geometry
 
 @parseAscii = parseAscii = ( text ) ->
@@ -85,5 +88,6 @@ Triangle = ->
   # Complete geometry data
   geometry.computeCentroids()
   geometry.computeBoundingSphere()
-
+  geometry.computeFaceNormals()
+  geometry.computeVertexNormals()
   return geometry
