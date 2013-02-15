@@ -37,15 +37,11 @@ Limitations: The binary loader could be optimized for memory.
   };
 
   this.parse = function(arrayBuffer) {
-    var head, i, s, u8a, _i, _ref;
+    var head, u8a;
     u8a = new Uint8Array(arrayBuffer);
     head = String.fromCharCode.apply(null, new Uint8Array(arrayBuffer, 0, 5));
     if (head === 'solid') {
-      s = '';
-      for (i = _i = 0, _ref = arrayBuffer.byteLength; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
-        s += String.fromCharCode(u8a[i]);
-      }
-      return parseAscii(s);
+      return parseAscii(u8a);
     } else {
       return parseBinary(u8a);
     }
@@ -79,23 +75,94 @@ Limitations: The binary loader could be optimized for memory.
     return geometry;
   };
 
-  this.parseAscii = parseAscii = function(text) {
-    var facetext, geometry, len, normal, patternFace, patternNormal, patternVertex, result;
+  this.parseAscii = parseAscii = function(u8a) {
+    var faces, geometry, i, idx, isBlank, len, name, normal, peekWord, readNumber, readWord, skipBlank, state, _i;
+    idx = 0;
+    state = 'START';
     geometry = new THREE.Geometry();
-    patternFace = /facet([\s\S]*?)endfacet/g;
-    result = void 0;
-    while ((result = patternFace.exec(text)) !== null) {
-      facetext = result[0];
-      patternNormal = /normal[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-      while ((result = patternNormal.exec(facetext)) !== null) {
-        normal = new THREE.Vector3(Number(result[1]), Number(result[3]), Number(result[5]));
+    isBlank = function() {
+      var _ref;
+      return (_ref = String.fromCharCode(u8a[idx])) === ' ' || _ref === '\n' || _ref === '\r';
+    };
+    skipBlank = function() {
+      var _results;
+      _results = [];
+      while (isBlank() && idx < u8a.length) {
+        _results.push(idx++);
       }
-      patternVertex = /vertex[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g;
-      while ((result = patternVertex.exec(facetext)) !== null) {
-        geometry.vertices.push(new THREE.Vector3(Number(result[1]), Number(result[3]), Number(result[5])));
+      return _results;
+    };
+    readWord = function(expected) {
+      var s;
+      skipBlank();
+      s = '';
+      while (idx < u8a.length && !isBlank()) {
+        s += String.fromCharCode(u8a[idx++]);
       }
-      len = geometry.vertices.length;
-      geometry.faces.push(new THREE.Face3(len - 3, len - 2, len - 1, normal));
+      skipBlank();
+      if ((expected != null) && expected !== s) {
+        throw new Error("Expected to read '" + expected + "' but got '" + s + "'");
+      }
+      return s;
+    };
+    peekWord = function(expected) {
+      var idx_bak, s;
+      idx_bak = idx;
+      s = readWord();
+      idx = idx_bak;
+      if (expected != null) {
+        return s === expected;
+      } else {
+        return s;
+      }
+    };
+    readNumber = function() {
+      var n;
+      n = readWord();
+      return parseFloat(n);
+    };
+    faces = 0;
+    ScanBuffer: //;
+
+    while (idx < u8a.length) {
+      switch (state) {
+        case 'START':
+          readWord('solid');
+          name = readWord();
+          state = 'FACET';
+          continue;
+        case 'FACET':
+          faces += 1;
+          if (faces % 100 === 0) {
+            console.log(faces, idx);
+          }
+          readWord('facet');
+          readWord('normal');
+          normal = new THREE.Vector3(readNumber(), readNumber(), readNumber());
+          readWord('outer');
+          readWord('loop');
+          for (i = _i = 0; _i < 3; i = ++_i) {
+            readWord('vertex');
+            geometry.vertices.push(new THREE.Vector3(readNumber(), readNumber(), readNumber()));
+          }
+          readWord('endloop');
+          readWord('endfacet');
+          len = geometry.vertices.length;
+          geometry.faces.push(new THREE.Face3(len - 3, len - 2, len - 1, normal));
+          if (peekWord('endsolid')) {
+            state = 'END';
+          }
+          continue;
+        case 'END':
+          break ScanBuffer;;
+
+          break;
+        default:
+          throw new Error("Unexpected state " + state);
+      }
+    }
+    if (state !== 'END') {
+      throw new Error("WTF, state should have been END but was " + state);
     }
     geometry.computeCentroids();
     geometry.computeBoundingSphere();

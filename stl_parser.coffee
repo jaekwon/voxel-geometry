@@ -29,11 +29,7 @@ Triangle = ->
   u8a = new Uint8Array( arrayBuffer )
   head = String.fromCharCode.apply( null, new Uint8Array( arrayBuffer, 0, 5 ) )
   if head is 'solid'
-    # TODO this could be more optimized, maybe.
-    s = ''
-    for i in [0...arrayBuffer.byteLength]
-      s += String.fromCharCode(u8a[i])
-    return parseAscii( s )
+    return parseAscii( u8a )
   else
     return parseBinary( u8a )
 
@@ -69,22 +65,74 @@ Triangle = ->
   # geometry.normalsNeedUpdate = true
   return geometry
 
-@parseAscii = parseAscii = ( text ) ->
+@parseAscii = parseAscii = ( u8a ) ->
+
+  idx = 0
+  state = 'START'
   geometry = new THREE.Geometry()
-  patternFace = /facet([\s\S]*?)endfacet/g
-  result = undefined
-  while (result = patternFace.exec( text )) != null
-    facetext = result[ 0 ]
-    # Normal
-    patternNormal = /normal[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g
-    while (result = patternNormal.exec( facetext ) ) != null
-      normal = new THREE.Vector3( Number(result[ 1 ]), Number(result[ 3 ]), Number(result[ 5 ]) )
-    # Vertex
-    patternVertex = /vertex[\s]+([-+]?[0-9]+\.?[0-9]*([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+[\s]+([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)+/g
-    while (result = patternVertex.exec( facetext ) ) != null
-      geometry.vertices.push(  new THREE.Vector3( Number(result[ 1 ]), Number(result[ 3 ]), Number(result[ 5 ]) ) )
-    len = geometry.vertices.length
-    geometry.faces.push( new THREE.Face3( len - 3, len - 2, len - 1, normal ) )
+
+  isBlank = -> String.fromCharCode( u8a[idx] ) in [' ', '\n', '\r']
+  skipBlank = -> idx++ while isBlank() and idx < u8a.length
+  readWord = (expected) ->
+    skipBlank()
+    s = ''
+    while idx < u8a.length and not isBlank()
+      s += String.fromCharCode( u8a[idx++] )
+    skipBlank()
+    throw new Error "Expected to read '#{expected}' but got '#{s}'" if expected? and expected isnt s
+    return s
+  peekWord = (expected) ->
+    idx_bak = idx
+    s = readWord()
+    idx = idx_bak
+    if expected?
+      return s is expected
+    else
+      return s
+  readNumber = ->
+    n = readWord()
+    return parseFloat(n)
+
+  faces = 0
+
+  `ScanBuffer: //` # a label, to break
+  while idx < u8a.length
+
+    switch state
+
+      when 'START'
+        readWord 'solid'
+        name = readWord()
+        state = 'FACET'
+        continue
+
+      when 'FACET'
+        faces += 1
+        if faces % 100 is 0
+          console.log faces, idx
+        readWord 'facet'
+        readWord 'normal'
+        normal = new THREE.Vector3( readNumber(), readNumber(), readNumber() )
+        readWord 'outer'
+        readWord 'loop'
+        for i in [0...3]
+          readWord 'vertex'
+          geometry.vertices.push new THREE.Vector3( readNumber(), readNumber(), readNumber() )
+        readWord 'endloop'
+        readWord 'endfacet'
+
+        len = geometry.vertices.length
+        geometry.faces.push new THREE.Face3( len - 3, len - 2, len - 1, normal )
+
+        state = 'END' if peekWord('endsolid')
+        continue
+
+      when 'END' then `break ScanBuffer;`
+
+      else throw new Error "Unexpected state #{state}"
+
+  throw new Error "WTF, state should have been END but was #{state}" unless state is 'END'
+
   # Complete geometry data
   geometry.computeCentroids()
   geometry.computeBoundingSphere()
